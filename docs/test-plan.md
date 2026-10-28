@@ -6,7 +6,7 @@
 | **Under test** | Web app `https://nextzy-game.vercel.app` (Next.js) and API `https://nextzy-game.onrender.com` (NestJS + PostgreSQL) |
 | **Sources of truth** | The project README (rules and design decisions) and `docs/openapi.yaml` (the API contract) |
 | **Author / date** | Siwat Jankam, 2026-10-28 |
-| **Status** | Executed once against production; results in section 8 |
+| **Status** | Executed 2026-10-28; three defects found and fixed the same day; results in section 8 |
 
 ## 1. Goal
 
@@ -52,10 +52,10 @@ throwaway player, prepares state through the API (for example "play until
 5,000"), and resets the player when it finishes. Nothing is shared between
 tests and nothing is left behind in the database.
 
-**Known defects are kept visible, not hidden.** A test for a defect that is
-still open is marked `todo` (Node) with the bug id. It still runs and still
-fails, which is the evidence, but it does not turn the suite red. When the
-defect is fixed the test starts passing and the `todo` marker is removed.
+**Open defects stay visible, not hidden.** While a defect was open, its test was
+marked `todo` (Node) with the bug id: it still ran and still failed, which was the
+evidence, but it did not turn the suite red. All three defects have since been
+fixed, their tests pass, and the markers are gone.
 
 ## 4. Environments
 
@@ -110,20 +110,32 @@ to point at a local run.
 
 ## 8. Results
 
-Executed 2026-10-28 against production.
+Both runs are against production, on 2026-10-28.
 
-| Suite | Tests | Passed | Open defects (expected failures) | Unexpected failures |
-|---|---|---|---|---|
-| API (`npm run test:api`) | 62 | 53 | 9, covering 3 bugs | 0 |
-| UI (`npm run test:e2e`) | 16 | 16 | 0 | 0 |
+| Run | Suite | Tests | Passed | Known-defect failures | Unexpected failures |
+|---|---|---|---|---|---|
+| 1. First pass | API (`npm run test:api`) | 62 | 53 | 9, covering 3 bugs | 0 |
+| | UI (`npm run test:e2e`) | 16 | 16 | 0 | 0 |
+| 2. After the fixes were deployed | API | 63 | 63 | 0 | 0 |
+| | UI | 16 | 16 | 0 | 0 |
 
-Open bugs:
+The API count went from 62 to 63 because I added a burst-of-25 case for a brand-new
+player, and one existing test changed on purpose (TC-API-061, below).
 
-| Id | Severity | Title |
-|---|---|---|
-| [BUG-001](bug-reports/BUG-001-parallel-first-plays-return-500.md) | Medium | Two rounds at the same moment for a new player: one answers 500 |
-| [BUG-002](bug-reports/BUG-002-claim-accepts-non-integer-checkpoint-spellings.md) | Low | Claim endpoint accepts spellings of the checkpoint that are not integers |
-| [BUG-003](bug-reports/BUG-003-uuid-is-case-sensitive.md) | Low | The same UUID in upper case is a different player |
+Bugs:
+
+| Id | Severity | Title | Status |
+|---|---|---|---|
+| [BUG-001](bug-reports/BUG-001-parallel-first-plays-return-500.md) | Medium | Two rounds at the same moment for a new player: one answers 500 | Fixed (`86541505`) |
+| [BUG-002](bug-reports/BUG-002-claim-accepts-non-integer-checkpoint-spellings.md) | Low | Claim endpoint accepts spellings of the checkpoint that are not integers | Fixed (`e33c10d9`) |
+| [BUG-003](bug-reports/BUG-003-uuid-is-case-sensitive.md) | Low | The same UUID in upper case is a different player | Fixed (`d4fcd436`) |
+
+The fix cycle: I reported the three defects, the fixes were made in the game's
+repository (each with unit tests that fail on the old code), and I re-ran the whole
+suite against the redeployed production. All nine tests that had been waiting on
+the defects passed. TC-API-061 ("a loose spelling cannot be used to claim twice")
+had asserted the old behaviour, a 409 for `5e3`; it now asserts the correct 400, a
+test changing because the product changed, not to make it pass.
 
 Worth saying plainly: the rules that matter most held up. Claim-once survived
 ten simultaneous claims and loose spellings of the checkpoint; parallel rounds
@@ -149,8 +161,10 @@ elements), not a defect in the game, and it was fixed in the test.
 
 - Everything ran against production, so a defect that depends on a different
   environment (local, staging) would not show up here.
-- The root cause in BUG-001 and BUG-002 is a hypothesis from reading the source;
-  I had no access to server logs to confirm it.
+- BUG-001's cause could not be read from production logs. I confirmed it by
+  reproducing the bug against a local copy of the original code and reading its
+  log (`Unique constraint failed on the constraint: Player_pkey`). BUG-002 and
+  BUG-003 were confirmed by the fixes and by unit tests that fail on the old code.
 - Only Chrome was used. Safari and Firefox behaviour of the `<dialog>` element and the
   layout is untested.
 - No accessibility audit beyond role-based locators and the target sizes in OBS-03.

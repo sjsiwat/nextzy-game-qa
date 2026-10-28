@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Open |
+| **Status** | **Fixed**, verified on production 2026-10-28 |
+| **Fixed in** | [nextzy-game `d4fcd436`](https://github.com/sjsiwat/nextzy-game/commit/d4fcd436) |
 | **Severity** | Low |
 | **Priority** | Low |
 | **Component** | Backend, player identity (all `/players/:playerId/...` endpoints) |
@@ -41,11 +42,18 @@ Low for the shipped web app, which always generates lower-case ids with
 `crypto.randomUUID()`. It matters for API clients and for anyone testing by hand
 who pastes an id in another case: progress appears to vanish.
 
-## Suggested fix
+## Fix
 
-Normalise on input (`@Transform(({ value }) => value.toLowerCase())` in
-`PlayerParamsDto`), or store the id as the database `uuid` type
-(`@db.Uuid`), which compares case-insensitively.
+`PlayerParamsDto` now lower-cases the id before it is used, so any spelling of a
+UUID is the same player. (Storing the column as the database `uuid` type would also
+work, but needs a migration.)
+
+## Verification
+
+After the fix was deployed, reading a lowercase player through the uppercase
+spelling returns the same total on production (TC-API-062, no longer `todo`).
+One consequence: a player created earlier under an upper-case id would no longer be
+found. Only my own test players were affected, and they had been reset.
 
 ## Evidence
 

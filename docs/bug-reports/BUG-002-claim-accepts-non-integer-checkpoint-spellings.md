@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Open |
+| **Status** | **Fixed**, verified on production 2026-10-28 |
+| **Fixed in** | [nextzy-game `e33c10d9`](https://github.com/sjsiwat/nextzy-game/commit/e33c10d9) |
 | **Severity** | Low (input validation is looser than the contract; no data is corrupted) |
 | **Priority** | Low |
 | **Component** | Backend, `POST /players/:playerId/rewards/:checkpoint/claim` |
@@ -52,16 +53,25 @@ any spelling is correctly refused with `409` (`TC-API-061` passes), so the
 "claim once" guarantee holds. The risk is a looser contract than documented,
 which can mask client bugs and confuse caching or logging keyed on the URL.
 
-## Analysis (hypothesis)
+## Root cause (confirmed)
 
-`ClaimParamsDto` uses `@Type(() => Number)` and then `@IsIn(CHECKPOINT_POINTS)`.
+`ClaimParamsDto` used `@Type(() => Number)` and then `@IsIn(CHECKPOINT_POINTS)`.
 `Number("5e3")`, `Number("0x1388")`, `Number(" 5000")` and so on all equal 5000,
-so the `IsIn` check passes.
+so the `IsIn` check passed. Confirmed by the new unit tests, which fail on the old
+code.
 
-## Suggested fix
+## Fix
 
-Validate the raw string first, for example `@Matches(/^(5000|7500|10000)$/)` or
-`@IsIn(["5000","7500","10000"])` before transforming.
+The path segment is now converted to a number only when it is exactly the text
+`5000`, `7500` or `10000`. Anything else stays a string and fails `IsIn` with the
+same 400 message as before.
+
+## Verification
+
+After the fix was deployed, all seven spellings in the table above answer
+**400** on production (TC-API-060, no longer `todo`). The "claim twice" check
+(TC-API-061) changed with it: the second, non-canonical spelling is now refused
+with 400 instead of 409, and the reward is still recorded once.
 
 ## Evidence
 

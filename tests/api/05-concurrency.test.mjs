@@ -31,16 +31,23 @@ describe("TC-API-051 no lost update below the cap", () => {
   });
 });
 
-// BUG-001: the first two rounds of a brand-new player, sent at the same moment,
-// make one of them fail with 500. Marked `todo` so the suite stays green while
-// the defect is open; the failure output is the evidence.
+// Regression test for BUG-001 (fixed in nextzy-game 86541505): the first two
+// rounds of a brand-new player, sent at the same moment, used to make one of
+// them fail with 500 (a race on the Player primary key).
 describe("TC-API-052 parallel first rounds of a brand-new player", () => {
-  it("should both succeed, and add up", { todo: "BUG-001: second request answers 500" }, async () => {
+  it("both succeed, and add up", async () => {
     for (let trial = 0; trial < 3; trial++) {
       const id = pool.newPlayer();
       const [a, b] = await Promise.all([play(id), play(id)]);
       assert.deepEqual([a.status, b.status], [201, 201], `trial ${trial}: ${JSON.stringify([a.body, b.body])}`);
       assert.equal((await summary(id)).body.totalScore, a.body.score + b.body.score);
     }
+  });
+
+  it("a burst of 25 for a brand-new player all succeed", async () => {
+    const id = pool.newPlayer();
+    const results = await Promise.all(Array.from({ length: 25 }, () => play(id)));
+    assert.deepEqual([...new Set(results.map((r) => r.status))], [201]);
+    assert.equal((await playHistory(id)).body.length, 25);
   });
 });

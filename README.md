@@ -14,20 +14,21 @@ how I checked it, and what I found.
 | | |
 |---|---|
 | [`docs/test-plan.md`](docs/test-plan.md) | Scope, approach, risks, coverage by requirement, results, what was not done |
-| [`docs/bug-reports/`](docs/bug-reports) | Three bug reports: steps, expected, actual, how often, impact, hypothesis, suggested fix |
-| [`tests/api/`](tests/api) | 62 API tests with Node's built-in runner, no dependencies |
+| [`docs/bug-reports/`](docs/bug-reports) | Three bug reports (all fixed): steps, expected, actual, how often, impact, root cause, fix, verification |
+| [`tests/api/`](tests/api) | 63 API tests with Node's built-in runner, no dependencies |
 | [`tests/e2e/`](tests/e2e) | 16 end-to-end tests with Playwright on a mobile viewport |
 
 ## Result in one paragraph
 
-78 automated tests. All the rules that matter most held: rewards cannot be
-claimed twice, even with ten simultaneous requests; the cap, reset and history
-limit behave as documented; the screen agrees with the server. The tests found
-**three defects**: a `500` when two rounds hit a brand-new player at the same
-moment (Medium, measured: 30 of 30 trials), a claim endpoint that accepts
-`5e3` and `0x1388` as checkpoint 5000 (Low), and a UUID that means a different
-player in upper case (Low). Open defects are kept as `todo` tests, so the suite
-stays green and the failure output stays as evidence.
+79 automated tests, all passing. The first pass found **three defects**: a `500` when
+two rounds hit a brand-new player at the same moment (Medium, measured: 30 of 30
+trials), a claim endpoint that accepted `5e3` and `0x1388` as checkpoint 5000 (Low),
+and a UUID that meant a different player in upper case (Low). The rules that matter
+most had held from the start: rewards cannot be claimed twice, even with ten
+simultaneous requests; the cap, reset and history limit behave as documented; the
+screen agrees with the server. The three defects were then fixed in the game, and I
+re-ran everything against the redeployed production: the same trial that failed 30 of
+30 times now fails 0 of 30.
 
 ## Run it
 

@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Open |
+| **Status** | **Fixed**, verified on production 2026-10-28 |
+| **Fixed in** | [nextzy-game `86541505`](https://github.com/sjsiwat/nextzy-game/commit/86541505) |
 | **Severity** | Medium (a valid request fails with a server error; no data is corrupted, a retry works) |
 | **Priority** | Medium |
 | **Component** | Backend, `POST /players/:playerId/game/play` |
@@ -61,20 +62,37 @@ Measured against production on 2026-10-28, each trial using a new player:
   "สุ่มคะแนน" together as a player's very first round, or any API client, can.
 - The player gets a generic error message and has to press again. No lost points.
 
-## Analysis (hypothesis, not confirmed: no access to server logs)
+## Root cause (confirmed)
 
-`GameService.play` runs `tx.player.upsert(...)` inside an interactive
-transaction. Two transactions that both find no player row can both try to
-insert it; the loser hits the primary-key unique constraint (Prisma `P2002`).
-`AllExceptionsFilter` turns any non-HTTP error into a generic 500, which is why
-the cause is invisible to the client.
+This started as a hypothesis, because production gives no access to server
+logs. I then reproduced it against a local copy of the unmodified code (three
+trials of two parallel rounds: `201` and `500` every time) and the server log
+showed `Unique constraint failed on the constraint: Player_pkey`.
 
-## Suggested fix
+`GameService.play` ran `tx.player.upsert(...)` inside an interactive
+transaction. Prisma's upsert checks, then inserts, so two transactions that both
+find no row both try to insert it; the loser hits the primary-key constraint
+(Prisma `P2002`). `AllExceptionsFilter` turns any non-HTTP error into a generic
+500, which is why the cause was invisible to the client.
 
-Create the player idempotently before the transaction (for example a raw
-`INSERT ... ON CONFLICT DO NOTHING`), or catch `P2002` around the upsert and
-retry once. Map any remaining expected race to a non-5xx response.
+## Fix
+
+The upsert was replaced by `createMany({ data: [{ id }], skipDuplicates: true })`,
+which is a single `INSERT ... ON CONFLICT DO NOTHING`, so two simultaneous first
+rounds no longer collide.
+
+## Verification
+
+After the fix was deployed, against production:
+
+| Scenario | Before | After |
+|---|---|---|
+| New player, 2 parallel rounds | 30 / 30 trials had a 500 | **0 / 30** |
+| New player, 25 parallel rounds | 28 of 100 requests failed | **0 of 100** |
+| Existing player, 2 or 25 parallel rounds | 0 failures | 0 failures |
+
+The test is no longer marked `todo` and passes (TC-API-052, plus a new burst-of-25 case).
 
 ## Evidence
 
-`tests/api/05-concurrency.test.mjs` (TC-API-052) and the table above.
+`tests/api/05-concurrency.test.mjs` (TC-API-052) and the tables above.

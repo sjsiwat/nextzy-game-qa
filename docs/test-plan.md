@@ -131,7 +131,8 @@ Bugs:
 | [BUG-003](bug-reports/BUG-003-uuid-is-case-sensitive.md) | Low | The same UUID in upper case is a different player | Fixed (`d4fcd436`) |
 
 The fix cycle: I reported the three defects, the fixes were made in the game's
-repository (each with unit tests that fail on the old code), and I re-ran the whole
+repository (the two input fixes with unit tests that fail on the old code; the race
+is covered by TC-API-052), and I re-ran the whole
 suite against the redeployed production. All nine tests that had been waiting on
 the defects passed. TC-API-061 ("a loose spelling cannot be used to claim twice")
 had asserted the old behaviour, a 409 for `5e3`; it now asserts the correct 400, a
